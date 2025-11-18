@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "risk_core"
+    static_configs:
+      - targets: ["risk-core:9898"]

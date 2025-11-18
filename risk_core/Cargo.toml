@@ -1,0 +1,24 @@
+[package]
+name = "risk_core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Risk Hotpath Team"]
+license = "MIT"
+
+[features]
+clickhouse = ["dep:clickhouse"]
+
+[dependencies]
+tokio = { workspace = true }
+prometheus = { workspace = true }
+once_cell = { workspace = true }
+anyhow = { workspace = true }
+clickhouse = { version = "0.11", optional = true }
+
+[dev-dependencies]
+pretty_assertions = "1"
+criterion = "0.5"
+
+[[bench]]
+name = "throughput"
+harness = false

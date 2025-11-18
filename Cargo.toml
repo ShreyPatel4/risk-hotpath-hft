@@ -1,0 +1,15 @@
+[workspace]
+members = ["risk_core"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["Risk Hotpath Team"]
+license = "MIT"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+prometheus = "0.13"
+once_cell = "1.19"
+anyhow = "1"
