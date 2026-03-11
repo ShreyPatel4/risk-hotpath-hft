@@ -1,0 +1,8 @@
+[package]
+name = "hot_swap_demo"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+risk-gate = { path = "../../risk-gate" }

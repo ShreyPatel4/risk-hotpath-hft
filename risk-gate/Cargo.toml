@@ -1,0 +1,23 @@
+[package]
+name = "risk-gate"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-alloc pre-trade risk gate for HFT systems"
+license = "MIT"
+categories = ["finance", "no-std"]
+
+[lib]
+name = "risk_gate"
+
+[features]
+default = []
+std = []
+ffi = ["std"]
+
+[dev-dependencies]
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "evaluate"
+harness = false

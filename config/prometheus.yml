@@ -1,7 +1,7 @@
 global:
-  scrape_interval: 15s
+  scrape_interval: 5s
 
 scrape_configs:
   - job_name: "risk_core"
     static_configs:
-      - targets: ["risk-core:9898"]
+      - targets: ["host.docker.internal:9898"]

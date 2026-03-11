@@ -13,11 +13,20 @@ tokio = { workspace = true }
 prometheus = { workspace = true }
 once_cell = { workspace = true }
 anyhow = { workspace = true }
-clickhouse = { version = "0.11", optional = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+risk-gate = { path = "../risk-gate" }
+axum = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clickhouse = { version = "0.12", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1"
 criterion = "0.5"
+tempfile = "3"
 
 [[bench]]
 name = "throughput"

@@ -6,12 +6,57 @@
     "panels": [
       {
         "type": "stat",
-        "title": "Simulated Events",
+        "title": "Market Events",
         "id": 1,
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
         "targets": [
-          {
-            "expr": "simulated_events"
-          }
+          { "expr": "risk_market_events_total", "legendFormat": "market events" }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Orders Evaluated",
+        "id": 2,
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          { "expr": "risk_orders_total", "legendFormat": "orders" }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Accepted",
+        "id": 3,
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "targets": [
+          { "expr": "risk_accept_total", "legendFormat": "accepted" }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Rejected",
+        "id": 4,
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "targets": [
+          { "expr": "sum(risk_reject_total)", "legendFormat": "rejected" }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Rejections by Rule",
+        "id": 5,
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          { "expr": "rate(risk_reject_total[1m])", "legendFormat": "{{rule}}" }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Risk Check Latency (us)",
+        "id": 6,
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "targets": [
+          { "expr": "histogram_quantile(0.50, rate(risk_check_latency_us_bucket[1m]))", "legendFormat": "p50" },
+          { "expr": "histogram_quantile(0.99, rate(risk_check_latency_us_bucket[1m]))", "legendFormat": "p99" }
         ]
       }
     ]

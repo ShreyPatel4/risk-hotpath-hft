@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>risk-hotpath-hft Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a1a;--card:#141428;--primary:#00d4ff;--success:#10b981;
+  --danger:#ef4444;--warning:#f59e0b;--text:#e2e8f0;--muted:#64748b;
+  --border:#1e293b;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;overflow-x:hidden}
+a{color:var(--primary);text-decoration:none}
+
+/* Header */
+.header{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:#0d0d20;border-bottom:1px solid var(--border)}
+.header h1{font-size:18px;font-weight:700;color:var(--primary);letter-spacing:1px}
+.header-right{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--muted)}
+.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.status-dot.connected{background:var(--success);box-shadow:0 0 6px var(--success)}
+.status-dot.disconnected{background:var(--danger);box-shadow:0 0 6px var(--danger)}
+
+/* Tabs */
+.tab-bar{display:flex;gap:0;background:#0d0d20;border-bottom:1px solid var(--border);padding:0 24px;overflow-x:auto}
+.tab-btn{padding:10px 20px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Layout */
+.content{padding:20px 24px;max-width:1600px;margin:0 auto}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Cards */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;text-align:center}
+.stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px}
+.stat-card .value{font-size:28px;font-weight:700}
+.stat-card .value.cyan{color:var(--primary)}
+.stat-card .value.green{color:var(--success)}
+.stat-card .value.red{color:var(--danger)}
+.stat-card .value.amber{color:var(--warning)}
+
+/* Charts */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px}
+.chart-box h3{font-size:13px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
+.chart-box canvas{width:100%!important;max-height:260px}
+.chart-box.full{grid-column:1/-1}
+
+/* Order Book */
+.ob-controls{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.ob-controls select{background:var(--card);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:13px}
+.ob-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.ob-stat{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:12px;text-align:center}
+.ob-stat .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.ob-stat .val{font-size:20px;font-weight:700;margin-top:4px}
+.ob-container{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ob-side{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px}
+.ob-side h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.ob-side h3.bid-title{color:var(--success)}
+.ob-side h3.ask-title{color:var(--danger)}
+.ob-row{display:flex;align-items:center;margin-bottom:4px;font-size:13px;font-family:'Courier New',monospace;position:relative;height:24px}
+.ob-row .bar{position:absolute;top:0;height:100%;border-radius:3px;opacity:.15}
+.ob-row .bar.bid-bar{right:0;background:var(--success)}
+.ob-row .bar.ask-bar{left:0;background:var(--danger)}
+.ob-row .price{width:50%;text-align:right;padding-right:8px;position:relative;z-index:1}
+.ob-row .qty{width:50%;text-align:left;padding-left:8px;position:relative;z-index:1;color:var(--muted)}
+
+/* Confusion matrix */
+.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:400px;margin:0 auto 20px}
+.cm-cell{border-radius:8px;padding:24px;text-align:center}
+.cm-cell .cm-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;opacity:.8}
+.cm-cell .cm-val{font-size:32px;font-weight:700}
+.cm-tp{background:rgba(16,185,129,.15);border:1px solid var(--success);color:var(--success)}
+.cm-fp{background:rgba(239,68,68,.15);border:1px solid var(--danger);color:var(--danger)}
+.cm-fn{background:rgba(245,158,11,.15);border:1px solid var(--warning);color:var(--warning)}
+.cm-tn{background:rgba(0,212,255,.15);border:1px solid var(--primary);color:var(--primary)}
+
+/* Decision stream table */
+.decision-table-wrap{max-height:480px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px}
+table.dtable{width:100%;border-collapse:collapse;font-size:12px;font-family:'Courier New',monospace}
+.dtable th{position:sticky;top:0;background:#1a1a36;padding:8px 10px;text-align:left;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-size:10px;border-bottom:1px solid var(--border)}
+.dtable td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.dtable tr.accepted td:nth-child(6){color:var(--success)}
+.dtable tr.rejected td:nth-child(6){color:var(--danger)}
+
+/* Replay */
+.replay-controls{display:flex;gap:12px;align-items:center;margin-bottom:20px}
+.replay-controls select{background:var(--card);color:var(--text);border:1px solid var(--border);padding:8px 14px;border-radius:6px;font-size:13px;min-width:280px}
+.btn{padding:8px 20px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--primary);color:#0a0a1a}
+.btn-primary:hover{filter:brightness(1.2)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:6px 14px;font-size:12px}
+.result-panel{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px}
+.result-panel h3{font-size:14px;color:var(--primary);margin-bottom:12px}
+.result-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.result-row .rk{color:var(--muted)}
+
+/* Dev / Logs */
+.log-filters{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+.log-filters label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.log-terminal{background:#050510;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'Courier New',monospace;font-size:11px;max-height:500px;overflow-y:auto;line-height:1.6}
+.log-line{white-space:pre-wrap;word-break:break-all}
+.log-line.INFO .log-level{color:var(--primary)}
+.log-line.WARN .log-level{color:var(--warning)}
+.log-line.ERROR .log-level{color:var(--danger)}
+.log-line.DEBUG .log-level{color:var(--muted)}
+.health-row{display:flex;gap:16px;margin-bottom:16px}
+.health-item{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 20px;display:flex;align-items:center;gap:10px;font-size:13px}
+.health-dot{width:8px;height:8px;border-radius:50%}
+.offload-section{margin-top:16px;display:flex;align-items:center;gap:16px}
+.offload-status{font-size:13px}
+
+/* DataGen */
+.info-panel{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:24px;max-width:700px}
+.info-panel h3{color:var(--primary);margin-bottom:12px}
+.info-panel p{color:var(--muted);font-size:14px;line-height:1.7;margin-bottom:8px}
+.info-panel code{background:#1a1a36;padding:2px 8px;border-radius:4px;font-size:13px;color:var(--warning)}
+
+/* Section titles */
+.section-title{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 12px}
+
+@media(max-width:900px){
+  .stat-grid,.chart-grid,.ob-container,.ob-stats{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>risk-hotpath-hft</h1>
+  <div class="header-right">
+    <span id="evt-counter">0 events</span>
+    <span><span class="status-dot disconnected" id="ws-dot"></span> <span id="ws-label">Disconnected</span></span>
+  </div>
+</div>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+  <button class="tab-btn" data-tab="orderbook">Order Book</button>
+  <button class="tab-btn" data-tab="risk">Risk Monitor</button>
+  <button class="tab-btn" data-tab="replay">Replay</button>
+  <button class="tab-btn" data-tab="dev">Dev Integration</button>
+  <button class="tab-btn" data-tab="datagen">Data Generator</button>
+</div>
+
+<div class="content">
+
+<!-- ==================== DASHBOARD ==================== -->
+<div id="tab-dashboard" class="tab-panel active">
+  <div class="stat-grid">
+    <div class="stat-card"><div class="label">Total Events</div><div class="value cyan" id="s-events">0</div></div>
+    <div class="stat-card"><div class="label">Total Orders</div><div class="value cyan" id="s-orders">0</div></div>
+    <div class="stat-card"><div class="label">Accept Rate</div><div class="value green" id="s-accept">0%</div></div>
+    <div class="stat-card"><div class="label">Avg Latency</div><div class="value amber" id="s-latency">0 &micro;s</div></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>Events / sec</h3><canvas id="chart-eps"></canvas></div>
+    <div class="chart-box"><h3>Accept / Reject Rate</h3><canvas id="chart-rates"></canvas></div>
+    <div class="chart-box full"><h3>Rejections by Rule</h3><canvas id="chart-rules"></canvas></div>
+  </div>
+</div>
+
+<!-- ==================== ORDER BOOK ==================== -->
+<div id="tab-orderbook" class="tab-panel">
+  <div class="ob-controls">
+    <label style="color:var(--muted);font-size:13px">Symbol:</label>
+    <select id="ob-symbol"></select>
+  </div>
+  <div class="ob-stats">
+    <div class="ob-stat"><div class="lbl">Best Bid</div><div class="val" id="ob-bb" style="color:var(--success)">—</div></div>
+    <div class="ob-stat"><div class="lbl">Best Ask</div><div class="val" id="ob-ba" style="color:var(--danger)">—</div></div>
+    <div class="ob-stat"><div class="lbl">Spread</div><div class="val" id="ob-sp" style="color:var(--warning)">—</div></div>
+    <div class="ob-stat"><div class="lbl">Mid Price</div><div class="val" id="ob-mid" style="color:var(--primary)">—</div></div>
+  </div>
+  <div class="ob-container">
+    <div class="ob-side"><h3 class="bid-title">Bids</h3><div id="ob-bids"></div></div>
+    <div class="ob-side"><h3 class="ask-title">Asks</h3><div id="ob-asks"></div></div>
+  </div>
+</div>
+
+<!-- ==================== RISK MONITOR ==================== -->
+<div id="tab-risk" class="tab-panel">
+  <div class="section-title">Confusion Matrix</div>
+  <div class="cm-grid">
+    <div class="cm-cell cm-tp"><div class="cm-label">True Positive</div><div class="cm-val" id="cm-tp">0</div></div>
+    <div class="cm-cell cm-fp"><div class="cm-label">False Positive</div><div class="cm-val" id="cm-fp">0</div></div>
+    <div class="cm-cell cm-fn"><div class="cm-label">False Negative</div><div class="cm-val" id="cm-fn">0</div></div>
+    <div class="cm-cell cm-tn"><div class="cm-label">True Negative</div><div class="cm-val" id="cm-tn">0</div></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>Rule Breakdown</h3><canvas id="chart-doughnut"></canvas></div>
+    <div class="chart-box"><h3>Live Decision Stream</h3>
+      <div class="decision-table-wrap" id="decision-wrap">
+        <table class="dtable">
+          <thead><tr><th>Order</th><th>Symbol</th><th>Side</th><th>Price</th><th>Qty</th><th>Result</th><th>Rule</th><th>Latency</th></tr></thead>
+          <tbody id="decision-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== REPLAY ==================== -->
+<div id="tab-replay" class="tab-panel">
+  <div class="replay-controls">
+    <select id="replay-file"><option value="">Select a .jsonl file...</option></select>
+    <button class="btn btn-primary" id="replay-run">Run Replay</button>
+  </div>
+  <div class="result-panel" id="replay-results" style="display:none">
+    <h3>Replay Results</h3>
+    <div id="replay-rows"></div>
+  </div>
+</div>
+
+<!-- ==================== DEV INTEGRATION ==================== -->
+<div id="tab-dev" class="tab-panel">
+  <div class="health-row">
+    <div class="health-item"><span class="health-dot" id="h-ws" style="background:var(--danger)"></span> WebSocket</div>
+    <div class="health-item"><span class="health-dot" id="h-api" style="background:var(--success)"></span> REST API</div>
+    <div class="health-item"><span class="health-dot" id="h-sim" style="background:var(--muted)"></span> Simulation</div>
+  </div>
+  <div class="offload-section">
+    <button class="btn btn-sm btn-primary" id="offload-btn">Toggle DB Offload</button>
+    <span class="offload-status">Status: <span id="offload-val" style="color:var(--danger)">OFF</span></span>
+  </div>
+  <div class="section-title" style="margin-top:20px">Log Stream</div>
+  <div class="log-filters">
+    <label><input type="checkbox" class="log-filter" value="INFO" checked> INFO</label>
+    <label><input type="checkbox" class="log-filter" value="WARN" checked> WARN</label>
+    <label><input type="checkbox" class="log-filter" value="ERROR" checked> ERROR</label>
+    <label><input type="checkbox" class="log-filter" value="DEBUG" checked> DEBUG</label>
+  </div>
+  <div class="log-terminal" id="log-terminal"></div>
+</div>
+
+<!-- ==================== DATA GENERATOR ==================== -->
+<div id="tab-datagen" class="tab-panel">
+  <div class="info-panel">
+    <h3>Dataset Generator</h3>
+    <p>Use the CLI to generate synthetic market + order datasets for replay and back-testing.</p>
+    <p>Command: <code>cargo run -- generate-dataset --events 100000 --out data/sim.jsonl</code></p>
+    <p>The generator creates a realistic stream of <code>MarketEvent</code> and <code>OrderRequest</code> records in JSONL format. Each order includes optional <code>expected_outcome</code> and <code>scenario_tag</code> fields for confusion-matrix evaluation.</p>
+    <p style="margin-top:16px">Generated files appear in the <strong>Replay</strong> tab file selector and can also be used for offline analysis.</p>
+    <p style="margin-top:12px"><a href="https://github.com/risk-hotpath-hft" target="_blank">Documentation &rarr;</a></p>
+  </div>
+</div>
+
+</div><!-- .content -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let ws = null;
+let connected = false;
+const MAX_DECISIONS = 200;
+const MAX_LOGS = 500;
+const epsData = Array(60).fill(0);
+const accData = Array(60).fill(0);
+const rejData = Array(60).fill(0);
+const labels60 = Array(60).fill('');
+let decisions = [];
+let logLines = [];
+
+// ── Charts ─────────────────────────────────────────────────────────
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = '#1e293b';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size = 11;
+
+const epsChart = new Chart(document.getElementById('chart-eps'),{
+  type:'line',
+  data:{labels:labels60,datasets:[{label:'Events/sec',data:epsData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.1)',fill:true,tension:.3,pointRadius:0,borderWidth:2}]},
+  options:{responsive:true,animation:false,scales:{y:{beginAtZero:true,grid:{color:'#1e293b'}},x:{display:false}},plugins:{legend:{display:false}}}
+});
+
+const ratesChart = new Chart(document.getElementById('chart-rates'),{
+  type:'line',
+  data:{labels:labels60,datasets:[
+    {label:'Accept %',data:accData,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,.1)',fill:true,tension:.3,pointRadius:0,borderWidth:2},
+    {label:'Reject %',data:rejData,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.1)',fill:true,tension:.3,pointRadius:0,borderWidth:2}
+  ]},
+  options:{responsive:true,animation:false,scales:{y:{beginAtZero:true,max:100,grid:{color:'#1e293b'}},x:{display:false}},plugins:{legend:{position:'top',labels:{boxWidth:12}}}}
+});
+
+const rulesChart = new Chart(document.getElementById('chart-rules'),{
+  type:'bar',
+  data:{labels:[],datasets:[{label:'Rejections',data:[],backgroundColor:'#ef4444',borderRadius:4}]},
+  options:{responsive:true,animation:false,indexAxis:'x',scales:{y:{beginAtZero:true,grid:{color:'#1e293b'}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}
+});
+
+const doughnutChart = new Chart(document.getElementById('chart-doughnut'),{
+  type:'doughnut',
+  data:{labels:[],datasets:[{data:[],backgroundColor:['#00d4ff','#ef4444','#f59e0b','#10b981','#8b5cf6','#ec4899']}]},
+  options:{responsive:true,animation:false,plugins:{legend:{position:'right',labels:{boxWidth:12,padding:8}}}}
+});
+
+// ── Tab navigation ─────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── WebSocket ──────────────────────────────────────────────────────
+function connectWS(){
+  ws = new WebSocket('ws://'+window.location.host+'/ws');
+  ws.onopen = ()=>{
+    connected=true;
+    document.getElementById('ws-dot').className='status-dot connected';
+    document.getElementById('ws-label').textContent='Connected';
+    document.getElementById('h-ws').style.background='var(--success)';
+  };
+  ws.onclose = ()=>{
+    connected=false;
+    document.getElementById('ws-dot').className='status-dot disconnected';
+    document.getElementById('ws-label').textContent='Disconnected';
+    document.getElementById('h-ws').style.background='var(--danger)';
+    setTimeout(connectWS,5000);
+  };
+  ws.onerror = ()=>{ ws.close(); };
+  ws.onmessage = (e)=>{
+    try{ handleMsg(JSON.parse(e.data)); }catch(_){}
+  };
+}
+connectWS();
+
+function handleMsg(msg){
+  if(msg.type==='stats') updateStats(msg.data);
+  else if(msg.type==='book') updateBookWS(msg.data);
+  else if(msg.type==='decision') addDecision(msg.data);
+  else if(msg.type==='log') addLog(msg.data);
+}
+
+// ── Stats update ───────────────────────────────────────────────────
+function updateStats(s){
+  document.getElementById('s-events').textContent=fmt(s.total_events);
+  document.getElementById('s-orders').textContent=fmt(s.total_orders);
+  document.getElementById('evt-counter').textContent=fmt(s.total_events)+' events';
+  const rate=s.total_orders>0?((s.accepted/s.total_orders)*100).toFixed(1):'0.0';
+  document.getElementById('s-accept').textContent=rate+'%';
+  document.getElementById('s-latency').innerHTML=s.avg_latency_us.toFixed(1)+' &micro;s';
+
+  epsData.push(s.events_per_sec);epsData.shift();
+  const ar=s.total_orders>0?(s.accepted/s.total_orders)*100:0;
+  const rr=s.total_orders>0?(s.rejected/s.total_orders)*100:0;
+  accData.push(ar);accData.shift();
+  rejData.push(rr);rejData.shift();
+  epsChart.update();ratesChart.update();
+
+  const rules=s.reject_by_rule||{};
+  rulesChart.data.labels=Object.keys(rules);
+  rulesChart.data.datasets[0].data=Object.values(rules);
+  rulesChart.update();
+
+  const dk=Object.keys(rules);const dv=Object.values(rules);
+  if(dk.length){doughnutChart.data.labels=dk;doughnutChart.data.datasets[0].data=dv;doughnutChart.update();}
+}
+
+function fmt(n){ return n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n); }
+
+// ── Decision stream ────────────────────────────────────────────────
+function addDecision(d){
+  decisions.unshift(d);
+  if(decisions.length>MAX_DECISIONS) decisions.pop();
+  renderDecisions();
+}
+
+function renderDecisions(){
+  const tbody=document.getElementById('decision-body');
+  tbody.innerHTML=decisions.map(d=>{
+    const cls=d.accepted?'accepted':'rejected';
+    return `<tr class="${cls}"><td>${d.order_id}</td><td>${d.symbol}</td><td>${d.side||'—'}</td><td>${d.price!=null?d.price.toFixed(2):'—'}</td><td>${d.qty||'—'}</td><td>${d.accepted?'ACCEPT':'REJECT'}</td><td>${d.rule_hit||'—'}</td><td>${d.latency_us} &micro;s</td></tr>`;
+  }).join('');
+}
+
+// ── Log stream ─────────────────────────────────────────────────────
+function addLog(l){
+  logLines.push(l);
+  if(logLines.length>MAX_LOGS) logLines.shift();
+  renderLogs();
+}
+
+function renderLogs(){
+  const filters=new Set();
+  document.querySelectorAll('.log-filter:checked').forEach(c=>filters.add(c.value));
+  const term=document.getElementById('log-terminal');
+  const visible=logLines.filter(l=>filters.has(l.level));
+  term.innerHTML=visible.map(l=>`<div class="log-line ${l.level}"><span class="log-level">[${l.level}]</span> <span style="color:var(--muted)">${l.timestamp}</span> <span style="color:#8b5cf6">${l.target}</span> ${escHtml(l.message)}</div>`).join('');
+  term.scrollTop=term.scrollHeight;
+}
+
+document.querySelectorAll('.log-filter').forEach(c=>c.addEventListener('change',renderLogs));
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── Order Book polling ─────────────────────────────────────────────
+function updateBookWS(data){/* optional: handle WS book pushes */}
+
+async function loadSymbols(){
+  try{
+    const r=await fetch('/api/symbols');
+    const syms=await r.json();
+    const sel=document.getElementById('ob-symbol');
+    sel.innerHTML=syms.map(s=>`<option value="${s}">${s}</option>`).join('');
+  }catch(_){}
+}
+
+async function pollBook(){
+  const sym=document.getElementById('ob-symbol').value;
+  if(!sym) return;
+  try{
+    const r=await fetch('/api/book/'+encodeURIComponent(sym));
+    const b=await r.json();
+    document.getElementById('ob-bb').textContent=b.best_bid!=null?b.best_bid.toFixed(2):'—';
+    document.getElementById('ob-ba').textContent=b.best_ask!=null?b.best_ask.toFixed(2):'—';
+    document.getElementById('ob-sp').textContent=b.spread!=null?b.spread.toFixed(4):'—';
+    document.getElementById('ob-mid').textContent=b.mid_price!=null?b.mid_price.toFixed(2):'—';
+
+    const maxQty=Math.max(...b.bids.map(l=>l.qty),...b.asks.map(l=>l.qty),1);
+    document.getElementById('ob-bids').innerHTML=b.bids.map(l=>{
+      const pct=(l.qty/maxQty*100).toFixed(1);
+      return `<div class="ob-row"><div class="bar bid-bar" style="width:${pct}%"></div><span class="price" style="color:var(--success)">${l.price.toFixed(2)}</span><span class="qty">${l.qty}</span></div>`;
+    }).join('');
+    document.getElementById('ob-asks').innerHTML=b.asks.map(l=>{
+      const pct=(l.qty/maxQty*100).toFixed(1);
+      return `<div class="ob-row"><div class="bar ask-bar" style="width:${pct}%"></div><span class="price" style="color:var(--danger)">${l.price.toFixed(2)}</span><span class="qty">${l.qty}</span></div>`;
+    }).join('');
+  }catch(_){}
+}
+
+loadSymbols();
+setInterval(pollBook,500);
+setInterval(loadSymbols,10000);
+
+// ── Confusion matrix polling ───────────────────────────────────────
+async function pollConfusion(){
+  try{
+    const r=await fetch('/api/confusion');
+    const c=await r.json();
+    document.getElementById('cm-tp').textContent=c.tp;
+    document.getElementById('cm-fp').textContent=c.fp;
+    document.getElementById('cm-fn').textContent=c.fn;
+    document.getElementById('cm-tn').textContent=c.tn;
+  }catch(_){}
+}
+setInterval(pollConfusion,2000);
+pollConfusion();
+
+// ── Replay ─────────────────────────────────────────────────────────
+async function loadFiles(){
+  try{
+    const r=await fetch('/api/files');
+    const files=await r.json();
+    const sel=document.getElementById('replay-file');
+    sel.innerHTML='<option value="">Select a .jsonl file...</option>'+files.map(f=>`<option value="${f}">${f}</option>`).join('');
+  }catch(_){}
+}
+loadFiles();
+
+document.getElementById('replay-run').addEventListener('click',async()=>{
+  const file=document.getElementById('replay-file').value;
+  if(!file){alert('Select a file first');return;}
+  document.getElementById('replay-results').style.display='none';
+  document.getElementById('replay-run').textContent='Running...';
+  document.getElementById('replay-run').disabled=true;
+  // Poll stats before & after — simple approach: just show current stats as results
+  await new Promise(r=>setTimeout(r,500));
+  try{
+    const r=await fetch('/api/stats');
+    const s=await r.json();
+    const rows=[
+      ['Total Events',fmt(s.total_events)],
+      ['Total Orders',fmt(s.total_orders)],
+      ['Accepted',fmt(s.accepted)],
+      ['Rejected',fmt(s.rejected)],
+      ['Avg Latency',s.avg_latency_us.toFixed(1)+' us'],
+    ];
+    const ruleKeys=Object.keys(s.reject_by_rule||{});
+    ruleKeys.forEach(k=>rows.push(['Reject: '+k,s.reject_by_rule[k]]));
+    document.getElementById('replay-rows').innerHTML=rows.map(([k,v])=>`<div class="result-row"><span class="rk">${k}</span><span>${v}</span></div>`).join('');
+    document.getElementById('replay-results').style.display='block';
+  }catch(_){}
+  document.getElementById('replay-run').textContent='Run Replay';
+  document.getElementById('replay-run').disabled=false;
+});
+
+// ── Offload toggle ─────────────────────────────────────────────────
+document.getElementById('offload-btn').addEventListener('click',async()=>{
+  try{
+    const r=await fetch('/api/offload',{method:'POST'});
+    const j=await r.json();
+    document.getElementById('offload-val').textContent=j.enabled?'ON':'OFF';
+    document.getElementById('offload-val').style.color=j.enabled?'var(--success)':'var(--danger)';
+  }catch(_){}
+});
+
+// ── Periodic stats poll (fallback if no WS) ────────────────────────
+async function pollStats(){
+  try{
+    const r=await fetch('/api/stats');
+    const s=await r.json();
+    updateStats(s);
+  }catch(_){}
+}
+setInterval(pollStats,2000);
+pollStats();
+
+// ── Initial log fetch ──────────────────────────────────────────────
+async function fetchLogs(){
+  try{
+    const r=await fetch('/api/logs');
+    const arr=await r.json();
+    logLines=arr.reverse();
+    renderLogs();
+  }catch(_){}
+}
+fetchLogs();
+</script>
+</body>
+</html>

@@ -1,6 +1,10 @@
+pub mod datagen;
 pub mod envelope;
 pub mod feed;
+pub mod logging;
+pub mod relay;
 pub mod replay;
 pub mod risk;
 pub mod store;
 pub mod telemetry;
+pub mod web;

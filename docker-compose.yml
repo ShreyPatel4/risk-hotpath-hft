@@ -14,8 +14,8 @@ services:
       - "9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    depends_on:
-      - clickhouse
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana-oss:latest
