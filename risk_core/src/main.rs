@@ -398,7 +398,7 @@ async fn run_gui(
                             match (decision.accepted, should_accept) {
                                 (true, true) => cm.tp += 1,
                                 (true, false) => cm.fp += 1,
-                                (false, true) => cm.r#fn += 1,
+                                (false, true) => cm.false_neg += 1,
                                 (false, false) => cm.tn += 1,
                             }
                         }

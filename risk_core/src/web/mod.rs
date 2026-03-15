@@ -40,10 +40,11 @@ pub struct LiveStats {
 /// which can cause "false negatives" — valid orders rejected due to accumulated state.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConfusionMatrix {
-    pub tp: u64, // accepted, and should have been accepted
-    pub fp: u64, // accepted, but should have been rejected
-    pub r#fn: u64, // rejected, but should have been accepted
-    pub tn: u64, // rejected, and should have been rejected
+    pub tp: u64,
+    pub fp: u64,
+    #[serde(rename = "fn")]
+    pub false_neg: u64,
+    pub tn: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
