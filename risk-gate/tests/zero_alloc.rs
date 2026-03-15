@@ -1,31 +1,29 @@
 //! Zero-allocation verification.
 //!
-//! Installs a custom global allocator that panics on any heap allocation.
-//! If `evaluate()` completes 1000 iterations without panicking, the
-//! zero-allocation guarantee is proven.
+//! Installs a custom global allocator that counts allocations made while
+//! the flag is set. If `evaluate()` causes any allocations, the test fails.
 //!
 //! This file MUST be a separate integration test binary because only one
 //! `#[global_allocator]` can exist per binary.
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use risk_gate::engine::RiskGate;
 use risk_gate::types::*;
 
-/// Allocator that panics when allocations are forbidden.
-struct PanicAllocator;
+/// Allocator that counts allocations when tracking is enabled.
+/// Does NOT panic — panicking from an allocator causes double-panic aborts
+/// because the panic machinery itself allocates.
+struct CountingAllocator;
 
-static ALLOC_ALLOWED: AtomicBool = AtomicBool::new(true);
+static TRACKING: AtomicBool = AtomicBool::new(false);
+static ALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
 
-unsafe impl GlobalAlloc for PanicAllocator {
+unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if !ALLOC_ALLOWED.load(Ordering::Relaxed) {
-            panic!(
-                "HEAP ALLOCATION DETECTED during risk gate evaluation! size={} align={}",
-                layout.size(),
-                layout.align()
-            );
+        if TRACKING.load(Ordering::Relaxed) {
+            ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         }
         unsafe { System.alloc(layout) }
     }
@@ -36,12 +34,12 @@ unsafe impl GlobalAlloc for PanicAllocator {
 }
 
 #[global_allocator]
-static A: PanicAllocator = PanicAllocator;
+static A: CountingAllocator = CountingAllocator;
 
 /// Prove that RiskGate::evaluate() performs zero heap allocations.
 #[test]
 fn test_evaluate_zero_alloc() {
-    // Set up gate while allocations are still allowed (for test harness)
+    // Set up gate while tracking is off (test harness may allocate freely)
     let config = RiskConfig::default();
     let mut gate = RiskGate::<256, 64>::new(config);
 
@@ -56,17 +54,18 @@ fn test_evaluate_zero_alloc() {
         })
         .collect();
 
-    // NOW: forbid all allocations
-    ALLOC_ALLOWED.store(false, Ordering::SeqCst);
+    // Reset counter and start tracking
+    ALLOC_COUNT.store(0, Ordering::SeqCst);
+    TRACKING.store(true, Ordering::SeqCst);
 
-    // Run 1000 evaluations — if any allocates, we panic
+    // Run 1000 evaluations
     for (i, order) in orders.iter().enumerate() {
         let ref_price = 100.0 + (i as f64 * 0.005);
-        let now_ns = i as u64 * 1_000_000; // 1ms spacing
+        let now_ns = i as u64 * 1_000_000;
         let _ = gate.evaluate(order, ref_price, now_ns);
     }
 
-    // Also test config swap under no-alloc
+    // Also test config swap under tracking
     let new_config = RiskConfig {
         max_quantity: 50_000,
         ..config
@@ -78,6 +77,12 @@ fn test_evaluate_zero_alloc() {
         let _ = gate.evaluate(order, 100.0, 2_000_000 + i as u64);
     }
 
-    // Re-enable allocations for test cleanup
-    ALLOC_ALLOWED.store(true, Ordering::SeqCst);
+    // Stop tracking before any assertion (assert may allocate for error messages)
+    TRACKING.store(false, Ordering::SeqCst);
+    let count = ALLOC_COUNT.load(Ordering::SeqCst);
+
+    assert_eq!(
+        count, 0,
+        "risk gate evaluate() performed {count} heap allocations — expected zero"
+    );
 }
