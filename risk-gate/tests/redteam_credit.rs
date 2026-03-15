@@ -113,21 +113,45 @@ fn test_credit_overflow_to_infinity() {
     let mut gate = RiskGate::<16, 16>::new(config);
 
     // First order: notional = f64::MAX / 2
-    let order1 = Order { order_id: 0, symbol_id: 0, trader_id: 0, price: f64::MAX / 2.0, quantity: 1, side: Side::Buy };
+    let order1 = Order {
+        order_id: 0,
+        symbol_id: 0,
+        trader_id: 0,
+        price: f64::MAX / 2.0,
+        quantity: 1,
+        side: Side::Buy,
+    };
     let d = gate.evaluate(&order1, 0.0, 0);
     assert_eq!(d, Decision::Accept);
 
     // Second order: notional = f64::MAX / 2 → total = f64::MAX (still finite, accepts)
-    let order2 = Order { order_id: 1, symbol_id: 1, trader_id: 0, price: f64::MAX / 2.0, quantity: 1, side: Side::Buy };
+    let order2 = Order {
+        order_id: 1,
+        symbol_id: 1,
+        trader_id: 0,
+        price: f64::MAX / 2.0,
+        quantity: 1,
+        side: Side::Buy,
+    };
     let d = gate.evaluate(&order2, 0.0, 1);
     assert_eq!(d, Decision::Accept);
 
     // Third order: notional large enough to overflow past f64::MAX.
     // At f64::MAX magnitude, the ULP is ~2e292, so we need to add at least that.
     // f64::MAX / 2.0 will overflow: f64::MAX + f64::MAX/2 = Inf
-    let order3 = Order { order_id: 2, symbol_id: 2, trader_id: 0, price: f64::MAX / 2.0, quantity: 1, side: Side::Buy };
+    let order3 = Order {
+        order_id: 2,
+        symbol_id: 2,
+        trader_id: 0,
+        price: f64::MAX / 2.0,
+        quantity: 1,
+        side: Side::Buy,
+    };
     let d = gate.evaluate(&order3, 0.0, 2);
-    assert!(d.is_reject(), "f64::MAX + f64::MAX/2 overflows to infinity, should reject");
+    assert!(
+        d.is_reject(),
+        "f64::MAX + f64::MAX/2 overflows to infinity, should reject"
+    );
 }
 
 /// After Fix 4: set_exposure(NaN) is now rejected (value not finite).

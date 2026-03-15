@@ -46,7 +46,7 @@ fn test_config_all_max() {
         max_quantity: u64::MAX,
         max_notional: f64::MAX,
         credit_limit: f64::MAX,
-        collar_lower: 0.0,  // widest possible band
+        collar_lower: 0.0, // widest possible band
         collar_upper: f64::MAX,
         dup_window_ns: 0, // disable dedup (window=0, only exact same ts matches)
     };

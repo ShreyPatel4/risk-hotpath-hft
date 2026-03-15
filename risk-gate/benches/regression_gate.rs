@@ -79,5 +79,9 @@ fn bench_gate_throughput_regression(c: &mut Criterion) {
     });
 }
 
-criterion_group!(regression, bench_gate_p99_regression, bench_gate_throughput_regression);
+criterion_group!(
+    regression,
+    bench_gate_p99_regression,
+    bench_gate_throughput_regression
+);
 criterion_main!(regression);
