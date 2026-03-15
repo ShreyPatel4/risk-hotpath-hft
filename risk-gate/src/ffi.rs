@@ -36,6 +36,9 @@ pub unsafe extern "C" fn risk_gate_evaluate(
     ref_price: f64,
     now_ns: u64,
 ) -> Decision {
+    if gate.is_null() || order.is_null() {
+        return Decision::RejectInvalidConfig;
+    }
     let gate = unsafe { &mut *gate };
     let order = unsafe { &*order };
     gate.inner.evaluate(order, ref_price, now_ns)
@@ -47,6 +50,9 @@ pub unsafe extern "C" fn risk_gate_evaluate(
 /// `gate` must be a valid pointer returned by `risk_gate_new`.
 #[no_mangle]
 pub unsafe extern "C" fn risk_gate_set_config(gate: *mut RiskGateHandle, config: RiskConfig) {
+    if gate.is_null() {
+        return;
+    }
     let gate = unsafe { &mut *gate };
     gate.inner.set_config(config);
 }
@@ -60,6 +66,9 @@ pub unsafe extern "C" fn risk_gate_trader_exposure(
     gate: *const RiskGateHandle,
     trader_id: u32,
 ) -> f64 {
+    if gate.is_null() {
+        return 0.0;
+    }
     let gate = unsafe { &*gate };
     gate.inner.trader_exposure(trader_id)
 }
@@ -70,6 +79,9 @@ pub unsafe extern "C" fn risk_gate_trader_exposure(
 /// `gate` must be a valid pointer.
 #[no_mangle]
 pub unsafe extern "C" fn risk_gate_reset_credit(gate: *mut RiskGateHandle) {
+    if gate.is_null() {
+        return;
+    }
     let gate = unsafe { &mut *gate };
     gate.inner.reset_all_credit();
 }

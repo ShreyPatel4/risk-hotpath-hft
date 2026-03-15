@@ -366,14 +366,42 @@ async fn run_gui(
                         stats.events_per_sec = events_per_sec;
                     }
                     SimEvent::Order(o) => {
-                        let decision = {
+                        let (decision, mid_price) = {
                             let book = state.book.read().await;
-                            engine.evaluate(o, &book)
+                            let mid = book.mid_price(&o.symbol).unwrap_or(0.0);
+                            (engine.evaluate(o, &book), mid)
                         };
                         metrics::record_risk_decision(&decision);
 
                         latency_sum += decision.latency_us as f64;
                         latency_count += 1;
+
+                        // Ground-truth heuristic: should this order have been accepted?
+                        // Based on stateless checks only (price, qty, notional, collar).
+                        // Stateful rejections (credit, dedup) are expected behavior.
+                        let should_accept = {
+                            let price_ok = o.price > 0.0 && o.price.is_finite();
+                            let qty_ok = o.qty > 0 && o.qty <= max_qty;
+                            let notional_ok = o.price * o.qty as f64 <= max_notional;
+                            let collar_ok = if mid_price > 0.0 {
+                                let lower = mid_price * (1.0 - 0.05);
+                                let upper = mid_price * (1.0 + 0.05);
+                                o.price >= lower && o.price <= upper
+                            } else {
+                                true
+                            };
+                            price_ok && qty_ok && notional_ok && collar_ok
+                        };
+
+                        {
+                            let mut cm = state.confusion.write().await;
+                            match (decision.accepted, should_accept) {
+                                (true, true) => cm.tp += 1,
+                                (true, false) => cm.fp += 1,
+                                (false, true) => cm.r#fn += 1,
+                                (false, false) => cm.tn += 1,
+                            }
+                        }
 
                         let mut stats = state.stats.write().await;
                         stats.total_events += 1;

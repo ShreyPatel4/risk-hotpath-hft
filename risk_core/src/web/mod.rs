@@ -29,6 +29,23 @@ pub struct LiveStats {
     pub reject_by_rule: HashMap<String, u64>,
 }
 
+/// Confusion matrix counters for risk gate evaluation quality.
+///
+/// Ground truth is derived from order characteristics:
+/// - "should accept" = price valid, qty within limits, notional within limits,
+///   price within collar of mid-price (if available)
+/// - "should reject" = violates any of the above
+///
+/// The risk gate may also reject for stateful reasons (credit exhaustion, duplicates)
+/// which can cause "false negatives" — valid orders rejected due to accumulated state.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConfusionMatrix {
+    pub tp: u64, // accepted, and should have been accepted
+    pub fp: u64, // accepted, but should have been rejected
+    pub r#fn: u64, // rejected, but should have been accepted
+    pub tn: u64, // rejected, and should have been rejected
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
     pub timestamp: String,
@@ -44,6 +61,7 @@ pub struct LogEntry {
 pub struct AppState {
     pub book: Arc<RwLock<OrderBook>>,
     pub stats: Arc<RwLock<LiveStats>>,
+    pub confusion: Arc<RwLock<ConfusionMatrix>>,
     pub logs: Arc<RwLock<VecDeque<LogEntry>>>,
     pub ws_tx: broadcast::Sender<String>,
     pub sim_running: Arc<AtomicBool>,
@@ -59,6 +77,7 @@ pub fn new_app_state() -> Arc<AppState> {
     Arc::new(AppState {
         book: Arc::new(RwLock::new(OrderBook::default())),
         stats: Arc::new(RwLock::new(LiveStats::default())),
+        confusion: Arc::new(RwLock::new(ConfusionMatrix::default())),
         logs: Arc::new(RwLock::new(VecDeque::with_capacity(512))),
         ws_tx,
         sim_running: Arc::new(AtomicBool::new(false)),
@@ -84,6 +103,7 @@ pub async fn start_server(state: Arc<AppState>, port: u16) -> anyhow::Result<()>
         .route("/api/book/{symbol}", get(book_handler))
         .route("/api/logs", get(logs_handler))
         .route("/api/files", get(files_handler))
+        .route("/api/confusion", get(confusion_handler))
         .route("/api/offload", post(offload_handler))
         .route("/ws", get(ws_handler))
         .with_state(state);
@@ -191,6 +211,11 @@ async fn files_handler() -> impl IntoResponse {
     }
     files.sort();
     Json(files)
+}
+
+async fn confusion_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let cm = state.confusion.read().await;
+    Json(cm.clone())
 }
 
 #[derive(Serialize)]

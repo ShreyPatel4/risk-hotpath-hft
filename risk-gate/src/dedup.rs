@@ -5,6 +5,18 @@
 /// When the buffer is full, the oldest entry is overwritten. This means orders older
 /// than `N` entries are automatically "forgotten" — size the ring appropriately for
 /// your expected dup window and order rate.
+///
+/// # Capacity requirement
+///
+/// The ring size `N` must be >= `order_rate * dup_window_duration`. If an attacker
+/// can submit `N` distinct orders within the window, they can evict a previous
+/// order's hash from the ring and re-submit it without detection. This is an
+/// inherent trade-off of fixed-capacity, zero-allocation design. Size `N`
+/// conservatively for your peak order rate.
+///
+/// # Panics
+///
+/// `N` must be > 0. A zero-capacity ring will fail at compile time.
 pub struct DupDetector<const N: usize> {
     ring: [(u64, u64); N], // (order_hash, timestamp_ns)
     head: usize,
@@ -20,6 +32,7 @@ impl<const N: usize> Default for DupDetector<N> {
 impl<const N: usize> DupDetector<N> {
     /// Create a new empty detector.
     pub const fn new() -> Self {
+        assert!(N > 0, "DupDetector ring size must be > 0");
         Self {
             ring: [(0, 0); N],
             head: 0,

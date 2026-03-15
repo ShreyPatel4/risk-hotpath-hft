@@ -35,6 +35,7 @@ pub enum Decision {
     RejectDuplicate = 5,
     RejectZeroQuantity = 6,
     RejectInvalidPrice = 7,
+    RejectInvalidConfig = 8,
 }
 
 impl Decision {
@@ -61,6 +62,7 @@ impl Decision {
             Decision::RejectDuplicate => "duplicate",
             Decision::RejectZeroQuantity => "zero_qty",
             Decision::RejectInvalidPrice => "invalid_price",
+            Decision::RejectInvalidConfig => "invalid_config",
         }
     }
 }
@@ -81,6 +83,24 @@ pub struct RiskConfig {
     pub collar_upper: f64,
     /// Duplicate detection time window in nanoseconds.
     pub dup_window_ns: u64,
+}
+
+impl RiskConfig {
+    /// Returns `true` if all configuration values are finite and non-negative.
+    ///
+    /// A config with NaN or Inf in any field could silently disable or invert
+    /// risk checks. This method should be called before using the config.
+    #[inline(always)]
+    pub fn is_valid(&self) -> bool {
+        self.max_notional.is_finite()
+            && self.max_notional >= 0.0
+            && self.credit_limit.is_finite()
+            && self.credit_limit >= 0.0
+            && self.collar_lower.is_finite()
+            && self.collar_lower >= 0.0
+            && self.collar_upper.is_finite()
+            && self.collar_upper >= 0.0
+    }
 }
 
 impl Default for RiskConfig {

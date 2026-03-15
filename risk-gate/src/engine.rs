@@ -58,6 +58,11 @@ impl<const T: usize, const D: usize> RiskGate<T, D> {
     /// Checks are ordered by expected failure frequency for early short-circuit.
     #[inline]
     pub fn evaluate(&mut self, order: &Order, ref_price: f64, now_ns: u64) -> Decision {
+        // Config validation — reject if NaN/Inf could silently disable checks
+        if !self.config.is_valid() {
+            return Decision::RejectInvalidConfig;
+        }
+
         // Sanity checks first (cheapest)
         if !checks::check_quantity_nonzero(order.quantity) {
             return Decision::RejectZeroQuantity;

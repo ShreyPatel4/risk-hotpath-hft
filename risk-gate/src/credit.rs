@@ -29,7 +29,12 @@ impl<const N: usize> CreditTracker<N> {
             return false;
         }
         let new_exposure = self.exposure[trader_idx] + notional;
-        if new_exposure > limit {
+        // NaN-safe: !(NaN <= x) is true, so NaN exposure always rejects.
+        // This prevents NaN propagation from silently disabling credit checks.
+        // The negated comparison is intentional — `new_exposure > limit` would
+        // return false for NaN, silently accepting orders.
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
+        if !(new_exposure <= limit) {
             return false;
         }
         self.exposure[trader_idx] = new_exposure;
@@ -60,9 +65,10 @@ impl<const N: usize> CreditTracker<N> {
     }
 
     /// Set exposure directly (for testing / state restoration).
+    /// Rejects NaN and infinite values to prevent poisoning the tracker.
     #[inline(always)]
     pub fn set_exposure(&mut self, trader_idx: usize, value: f64) {
-        if trader_idx < N {
+        if trader_idx < N && value.is_finite() {
             self.exposure[trader_idx] = value;
         }
     }

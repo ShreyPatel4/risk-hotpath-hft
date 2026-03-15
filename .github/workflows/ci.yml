@@ -29,5 +29,15 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: Red Team Tests
+        run: make redteam
+      - name: FFI Red Team
+        run: make redteam-ffi
+      - name: Immunity Tests
+        run: make immunity
+      - name: Stress Tests
+        run: make stress
+      - name: Zero Allocation Verification
+        run: make zero-alloc
       - name: Bench (compile only)
         run: cargo bench --workspace --no-run
