@@ -1319,6 +1319,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "risk-gate-wasm"
+version = "0.1.0"
+dependencies = [
+ "risk-gate",
+]
+
+[[package]]
 name = "risk_core"
 version = "0.1.0"
 dependencies = [

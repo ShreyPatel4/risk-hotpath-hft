@@ -1,0 +1,14 @@
+[package]
+name = "risk-gate-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Flat C-ABI wasm exports over risk-gate for the in-browser demo"
+license = "MIT"
+
+[lib]
+name = "risk_gate_wasm"
+crate-type = ["cdylib"]
+
+[dependencies]
+risk-gate = { path = "../risk-gate" }
+
